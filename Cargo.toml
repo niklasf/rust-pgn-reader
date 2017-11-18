@@ -23,6 +23,7 @@ memmap = "0.6"
 madvise = "0.1"
 unicase = "2.0"
 bencher = "0.1"
+average = { git = "https://github.com/vks/average.git" }
 
 [badges]
 travis-ci = { repository = "niklasf/rust-pgn-reader", branch = "master" }
