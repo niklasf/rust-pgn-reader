@@ -1,9 +1,12 @@
 extern crate pgn_reader;
+extern crate arrayvec;
 extern crate memmap;
 extern crate madvise;
 extern crate shakmaty;
 
 use pgn_reader::{Visitor, Skip, Reader, San};
+
+use arrayvec::ArrayVec;
 
 use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece};
 
@@ -56,18 +59,22 @@ impl<'pgn> Visitor<'pgn> for Histogram {
             let mut legals = MoveList::new();
             self.pos.legal_moves(&mut legals);
 
-            legals.sort_unstable_by_key(|m| {
-                let p = m.promotion().unwrap_or(Role::Pawn);
-                let c = m.is_capture();
-                let see = poor_mans_see(&self.pos, m);
-                let val = move_value(self.pos.turn(), m);
-                let from = m.from().expect("no drops");
-                (p, c, see, val, m.to(), from)
-            });
+            let mut augmented: ArrayVec<[(&Move, (_)); 512]> = legals.iter().map(|m| {
+                let score =
+                    ((m.promotion().unwrap_or(Role::Pawn) as u32) << 26) +
+                    ((m.is_capture() as u32) << 25) +
+                    (poor_mans_see(&self.pos, m) << 22) +
+                    (((512 + move_value(self.pos.turn(), m)) as u32) << 12) +
+                    (u32::from(m.to()) << 6) +
+                    u32::from(m.from().expect("no drops"));
 
-            legals.reverse();
+                (m, score)
+            }).collect();
 
-            let idx = match legals.iter().position(|m| san.matches(m)) {
+            augmented.sort_unstable_by_key(|a| a.1);
+            augmented.reverse();
+
+            let idx = match augmented.iter().position(|a| san.matches(a.0)) {
                 Some(idx) => idx,
                 None => {
                     eprintln!("illegal san: {}", san);
@@ -78,7 +85,7 @@ impl<'pgn> Visitor<'pgn> for Histogram {
 
             self.counts[idx] += 1;
 
-            self.pos.play_unchecked(&legals[idx]);
+            self.pos.play_unchecked(&augmented[idx].0);
         }
     }
 
@@ -95,11 +102,11 @@ fn move_value(turn: Color, m: &Move) -> i16 {
     piece_value(role.of(turn), m.to()) - piece_value(role.of(turn), m.from().expect("no drops"))
 }
 
-fn poor_mans_see(pos: &Chess, m: &Move) -> i8 {
+fn poor_mans_see(pos: &Chess, m: &Move) -> u32 {
     if (shakmaty::attacks::pawn_attacks(pos.turn(), m.to()) & pos.board().pawns() & pos.them()).any() {
-        -((m.role() as usize) as i8)
+        5 - m.role() as u32
     } else {
-        0
+        6
     }
 }
 
