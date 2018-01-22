@@ -71,8 +71,7 @@ impl<'pgn> Visitor<'pgn> for Histogram {
                 (m, score)
             }).collect();
 
-            augmented.sort_unstable_by_key(|a| a.1);
-            augmented.reverse();
+            augmented.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
             let idx = match augmented.iter().position(|a| san.matches(a.0)) {
                 Some(idx) => idx,
