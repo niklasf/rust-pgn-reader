@@ -57,7 +57,7 @@ impl<'pgn> Visitor<'pgn> for Histogram {
             self.pos.legal_moves(&mut legals);
 
             legals.sort_unstable_by_key(|m| {
-                let p = m.promotion().map(role_index).unwrap_or(0);
+                let p = m.promotion().unwrap_or(Role::Pawn);
                 let c = m.is_capture();
                 let see = poor_mans_see(&self.pos, m);
                 let val = move_value(self.pos.turn(), m);
@@ -85,20 +85,9 @@ impl<'pgn> Visitor<'pgn> for Histogram {
     fn end_game(&mut self, _game: &'pgn [u8]) { }
 }
 
-fn role_index(role: Role) -> usize {
-    match role {
-        Role::Pawn => 0,
-        Role::Knight => 1,
-        Role::Bishop => 2,
-        Role::Rook => 3,
-        Role::Queen => 4,
-        Role::King => 5,
-    }
-}
-
 fn piece_value(piece: Piece, square: Square) -> i16 {
     let sq = if piece.color.is_white() { square.flip_vertical() } else { square };
-    PSQT[role_index(piece.role)][usize::from(sq)]
+    PSQT[piece.role as usize][usize::from(sq)]
 }
 
 fn move_value(turn: Color, m: &Move) -> i16 {
@@ -108,7 +97,7 @@ fn move_value(turn: Color, m: &Move) -> i16 {
 
 fn poor_mans_see(pos: &Chess, m: &Move) -> i8 {
     if (shakmaty::attacks::pawn_attacks(pos.turn(), m.to()) & pos.board().pawns() & pos.them()).any() {
-        -(role_index(m.role()) as i8)
+        -((m.role() as usize) as i8)
     } else {
         0
     }
