@@ -62,8 +62,7 @@ impl<'pgn> Visitor<'pgn> for Histogram {
                 let see = poor_mans_see(&self.pos, m);
                 let val = move_value(self.pos.turn(), m);
                 let from = m.from().expect("no drops");
-                //(p, c, see, val, m.to(), from)
-                (p, see, c, val, m.to(), from)
+                (p, c, see, val, m.to(), from)
             });
 
             legals.reverse();
