@@ -58,7 +58,7 @@ impl<'pgn> Visitor<'pgn> for Histogram {
 
             legals.sort_unstable_by_key(|m| {
                 let p = m.promotion().map(role_index).unwrap_or(0);
-                let c = m.capture().is_some();
+                let c = m.is_capture();
                 let see = poor_mans_see(&self.pos, m);
                 let val = move_value(self.pos.turn(), m);
                 let from = m.from().expect("no drops");
@@ -179,6 +179,7 @@ static PSQT: [[i16; 64]; 6] = [
 
 fn main() {
     let mut histogram = Histogram::new();
+    let mut num_games = 0;
 
     for arg in env::args().skip(1) {
         eprintln!("reading {} ...", arg);
@@ -186,8 +187,9 @@ fn main() {
         let pgn = unsafe { Mmap::map(&file).expect("mmap") };
         pgn.advise_memory_access(AccessPattern::Sequential).expect("madvise");
 
-        Reader::new(&mut histogram, &pgn[..]).read_all();
+        num_games += Reader::new(&mut histogram, &pgn[..]).into_iter().count();
 
-        println!("{:?}", &histogram.counts[..]);
+        println!("histogram = {:?}", &histogram.counts[..]);
+        println!("num_games = {}", num_games);
     }
 }
