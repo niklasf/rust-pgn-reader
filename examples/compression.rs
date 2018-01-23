@@ -8,7 +8,7 @@ use pgn_reader::{Visitor, Skip, Reader, San};
 
 use arrayvec::ArrayVec;
 
-use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece};
+use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece, Bitboard};
 
 use memmap::Mmap;
 use madvise::{AccessPattern, AdviseMemory};
@@ -61,9 +61,10 @@ impl<'pgn> Visitor<'pgn> for Histogram {
 
             let mut augmented: ArrayVec<[(&Move, (_)); 512]> = legals.iter().map(|m| {
                 let score =
-                    ((m.promotion().unwrap_or(Role::Pawn) as u32) << 26) +
-                    ((m.is_capture() as u32) << 25) +
-                    (poor_mans_see(&self.pos, m) << 22) +
+                    ((m.promotion().unwrap_or(Role::Pawn) as u32) << 27) +
+                    ((m.is_capture() as u32) << 26) +
+                    (poor_mans_see(&self.pos, m) << 23) +
+                    ((eyes_king(&self.pos, m) as u32) << 22) + // not currently used in prod
                     (((512 + move_value(self.pos.turn(), m)) as u32) << 12) +
                     (u32::from(m.to()) << 6) +
                     u32::from(m.from().expect("no drops"));
@@ -99,6 +100,10 @@ fn piece_value(piece: Piece, square: Square) -> i16 {
 fn move_value(turn: Color, m: &Move) -> i16 {
     let role = m.role();
     piece_value(role.of(turn), m.to()) - piece_value(role.of(turn), m.from().expect("no drops"))
+}
+
+fn eyes_king(pos: &Chess, m: &Move) -> bool {
+    shakmaty::attacks::attacks(m.to(), m.role().of(pos.turn()), Bitboard(0)).contains(pos.board().king_of(!pos.turn()).expect("king in standard chess"))
 }
 
 fn poor_mans_see(pos: &Chess, m: &Move) -> u32 {
