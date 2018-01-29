@@ -1,0 +1,7 @@
+[package]
+name = "spsa"
+version = "0.1.0"
+authors = ["Niklas Fiekas <niklas.fiekas@backscattering.de>"]
+
+[dependencies]
+rand = "0.4"

@@ -4,14 +4,20 @@ extern crate memmap;
 extern crate madvise;
 extern crate shakmaty;
 extern crate huffman_compress;
+extern crate spsa;
+extern crate float_cmp;
 
 use pgn_reader::{Visitor, Skip, Reader, San};
+
+use spsa::{HyperParameters};
 
 use huffman_compress::{Tree, Book, codebook};
 
 use arrayvec::ArrayVec;
 
-use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece, Bitboard};
+use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece};
+
+use float_cmp::ApproxOrdUlps;
 
 use memmap::Mmap;
 use madvise::{AccessPattern, AdviseMemory};
@@ -24,14 +30,16 @@ struct Histogram {
     counts: [u64; 256],
     pos: Chess,
     skip: bool,
+    theta: [f64; 6]
 }
 
 impl Histogram {
-    fn new() -> Histogram {
+    fn new(theta: [f64; 6]) -> Histogram {
         Histogram {
             counts: [0; 256],
             pos: Chess::default(),
             skip: false,
+            theta,
         }
     }
 
@@ -83,17 +91,16 @@ impl<'pgn> Visitor<'pgn> for Histogram {
 
             let mut augmented: ArrayVec<[(&Move, (_)); 512]> = legals.iter().map(|m| {
                 let score =
-                    ((m.promotion().unwrap_or(Role::Pawn) as u32) << 26) +
-                    ((m.is_capture() as u32) << 25) +
-                    (poor_mans_see(&self.pos, m) << 22) +
-                    (((512 + move_value(self.pos.turn(), m)) as u32) << 12) +
-                    (u32::from(m.to()) << 6) +
-                    u32::from(m.from().expect("no drops"));
-
+                    self.theta[0] * (m.promotion().unwrap_or(Role::Pawn) as u8 as f64 / 6.0) +
+                    self.theta[1] * (m.is_capture() as u8 as f64) +
+                    self.theta[2] * (poor_mans_see(&self.pos, m) as f64 / 6.0) +
+                    self.theta[3] * ((move_value(self.pos.turn(), m) + 500) as f64 / 1000.0) +
+                    self.theta[4] * (u32::from(m.to()) as f64 / 64.0) +
+                    self.theta[5] * (u32::from(m.from().expect("no drops")) as f64 / 64.0);
                 (m, score)
             }).collect();
 
-            augmented.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+            augmented.sort_unstable_by(|a, b| b.1.approx_cmp(&a.1, 1));
 
             let idx = match augmented.iter().position(|a| san.matches(a.0)) {
                 Some(idx) => idx,
@@ -195,20 +202,34 @@ static PSQT: [[i16; 64]; 6] = [
 ];
 
 fn main() {
-    let mut histogram = Histogram::new();
-    let mut num_games = 0;
+    let arg = env::args().skip(1).next().expect("pgn file as argument");
+    eprintln!("reading {} ...", arg);
+    let file = File::open(&arg).expect("fopen");
+    let mmap = unsafe { Mmap::map(&file).expect("mmap") };
+    let mut pgn = &mmap[..];
+    pgn.advise_memory_access(AccessPattern::Sequential).expect("madvise");
 
-    for arg in env::args().skip(1) {
-        eprintln!("reading {} ...", arg);
-        let file = File::open(&arg).expect("fopen");
-        let pgn = unsafe { Mmap::map(&file).expect("mmap") };
-        pgn.advise_memory_access(AccessPattern::Sequential).expect("madvise");
+    let batch_size = 100;
 
-        num_games += Reader::new(&mut histogram, &pgn[..]).into_iter().count();
-        let bits = histogram.bits();
+    let mut spsa = HyperParameters::default().spsa();
 
-        println!("histogram = {:?}", &histogram.counts[..]);
-        println!("num_games = {}", num_games);
-        println!("# {} bytes per game", bits as f64 / num_games as f64 / 8.0);
+    for k in 0..1000 {
+        spsa.step(&mut |theta| {
+            let mut histogram = Histogram::new(theta);
+
+            {
+                let mut reader = Reader::new(&mut histogram, pgn);
+
+                pgn = reader.remaining_pgn();
+
+                for _ in 0..batch_size {
+                    reader.read_game();
+                }
+            }
+
+            let bytes = histogram.bits() as f64 / batch_size as f64 / 8.0;
+            println!("k={} bytes={} theta={:?}", k, bytes, theta);
+            bytes
+        });
     }
 }

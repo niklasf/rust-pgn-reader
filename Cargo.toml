@@ -26,6 +26,8 @@ bencher = "0.1"
 arrayvec = "0.4"
 huffman-compress = "0.1"
 bit-vec = "0.4"
+spsa = { path = "spsa" }
+float-cmp = "0.3"
 
 [badges]
 travis-ci = { repository = "niklasf/rust-pgn-reader", branch = "master" }

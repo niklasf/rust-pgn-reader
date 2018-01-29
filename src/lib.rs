@@ -382,6 +382,11 @@ impl<'a, 'pgn, V: Visitor<'pgn>> Reader<'a, 'pgn, V> {
         while let Some(_) = self.read_game() { }
     }
 
+    /// Returns a byte slice of the remaining PGN.
+    pub fn remaining_pgn(&self) -> &'pgn [u8] {
+        self.pgn
+    }
+
     fn scan_headers(&mut self) -> usize {
         let mut pos = 0;
 
