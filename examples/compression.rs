@@ -3,8 +3,11 @@ extern crate arrayvec;
 extern crate memmap;
 extern crate madvise;
 extern crate shakmaty;
+extern crate huffman_compress;
 
 use pgn_reader::{Visitor, Skip, Reader, San};
+
+use huffman_compress::{Tree, Book, codebook};
 
 use arrayvec::ArrayVec;
 
@@ -15,6 +18,7 @@ use madvise::{AccessPattern, AdviseMemory};
 
 use std::env;
 use std::fs::File;
+use std::collections::HashMap;
 
 struct Histogram {
     counts: [u64; 256],
@@ -29,6 +33,24 @@ impl Histogram {
             pos: Chess::default(),
             skip: false,
         }
+    }
+
+    fn huffman(&self) -> (Book<u8>, Tree<u8>) {
+        let weights: HashMap<_, _> = self.counts.iter()
+            .enumerate()
+            .map(|(k, v)| (k as u8, v + 1))
+            .collect();
+
+        codebook(&weights)
+    }
+
+    fn bits(&self) -> u64 {
+        let (book, _) = self.huffman();
+
+        self.counts.iter()
+            .enumerate()
+            .map(|(k, v)| book.get(&(k as u8)).map_or(0, |c| c.len() as u64 * v))
+            .sum()
     }
 }
 
@@ -188,8 +210,10 @@ fn main() {
         pgn.advise_memory_access(AccessPattern::Sequential).expect("madvise");
 
         num_games += Reader::new(&mut histogram, &pgn[..]).into_iter().count();
+        let bits = histogram.bits();
 
         println!("histogram = {:?}", &histogram.counts[..]);
         println!("num_games = {}", num_games);
+        println!("bits = {}  # {} per game", bits, bits as f64 / num_games as f64);
     }
 }
