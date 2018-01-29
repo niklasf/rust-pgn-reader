@@ -81,6 +81,26 @@ impl<'pgn> Visitor<'pgn> for Histogram {
             let mut legals = MoveList::new();
             self.pos.legal_moves(&mut legals);
 
+            // add all pseudo legal king moves
+            let our_king = self.pos.board().king_of(self.pos.turn()).expect("has king");
+            let mut king_ring = shakmaty::attacks::king_attacks(our_king) & !self.pos.us();
+
+            for m in &legals {
+                if m.role() == Role::King {
+                    king_ring.discard(m.to());
+                }
+            }
+
+            for sq in king_ring {
+                legals.push(Move::Normal {
+                    role: Role::King,
+                    from: our_king,
+                    capture: self.pos.board().role_at(sq),
+                    to: sq,
+                    promotion: None,
+                });
+            }
+
             let mut augmented: ArrayVec<[(&Move, (_)); 512]> = legals.iter().map(|m| {
                 let score =
                     ((m.promotion().unwrap_or(Role::Pawn) as u32) << 26) +
