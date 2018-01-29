@@ -214,6 +214,6 @@ fn main() {
 
         println!("histogram = {:?}", &histogram.counts[..]);
         println!("num_games = {}", num_games);
-        println!("bits = {}  # {} per game", bits, bits as f64 / num_games as f64);
+        println!("# {} bytes per game", bits as f64 / num_games as f64 / 8.0);
     }
 }
