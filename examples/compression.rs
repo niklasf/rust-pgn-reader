@@ -11,7 +11,7 @@ use pgn_reader::{Visitor, Skip, Reader, San};
 
 use spsa::{HyperParameters};
 
-use huffman_compress::{Tree, Book, codebook};
+use huffman_compress::{Tree, Book, CodeBuilder};
 
 use arrayvec::ArrayVec;
 
@@ -24,7 +24,6 @@ use madvise::{AccessPattern, AdviseMemory};
 
 use std::env;
 use std::fs::File;
-use std::collections::HashMap;
 
 struct Histogram {
     counts: [u64; 256],
@@ -44,12 +43,11 @@ impl Histogram {
     }
 
     fn huffman(&self) -> (Book<u8>, Tree<u8>) {
-        let weights: HashMap<_, _> = self.counts.iter()
+        self.counts.iter()
             .enumerate()
             .map(|(k, v)| (k as u8, v + 1))
-            .collect();
-
-        codebook(&weights)
+            .collect::<CodeBuilder<_, _>>()
+            .finish()
     }
 
     fn bits(&self) -> u64 {
