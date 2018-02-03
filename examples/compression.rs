@@ -11,7 +11,7 @@ use huffman_compress::{Tree, Book, codebook};
 
 use arrayvec::ArrayVec;
 
-use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece, Bitboard};
+use shakmaty::{Chess, Role, Position, Setup, MoveList, Square, Move, Color, Piece};
 
 use memmap::Mmap;
 use madvise::{AccessPattern, AdviseMemory};

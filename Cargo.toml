@@ -24,7 +24,7 @@ madvise = "0.1"
 unicase = "2.0"
 bencher = "0.1"
 arrayvec = "0.4"
-huffman-compress = "0.1"
+huffman-compress = "0.2"
 bit-vec = "0.4"
 
 [badges]
