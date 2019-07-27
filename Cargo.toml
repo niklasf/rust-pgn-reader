@@ -13,7 +13,7 @@ keywords = ["chess", "pgn"]
 memchr = "2.1"
 btoi = "0.4"
 shakmaty = "0.14"
-slice-deque = "^0.1.16"
+slice-deque = "^0.2.4"
 
 [dev-dependencies]
 crossbeam = "0.7"
