@@ -18,7 +18,7 @@ slice-deque = "0.3"
 
 [dev-dependencies]
 crossbeam = "0.7"
-bzip2 = "0.3"
+bzip2 = "0.4"
 xz2 = "0.1"
 flate2 = "1.0"
 lz4 = "1.23"
