@@ -17,7 +17,7 @@ shakmaty = "0.16"
 slice-deque = "0.3"
 
 [dev-dependencies]
-crossbeam = "0.7"
+crossbeam = "0.8"
 bzip2 = "0.3"
 xz2 = "0.1"
 flate2 = "1.0"
