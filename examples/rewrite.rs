@@ -14,6 +14,7 @@ struct Rewrite<W> {
     white: bool,
     ply: u32,
     after_comment: bool,
+    outcome: bool,
 }
 
 impl<W: io::Write> Visitor for Rewrite<W> {
@@ -22,6 +23,7 @@ impl<W: io::Write> Visitor for Rewrite<W> {
     fn begin_game(&mut self) {
         self.white = true;
         self.ply = 1;
+        self.outcome = false;
         self.after_comment = false;
     }
 
@@ -72,18 +74,21 @@ impl<W: io::Write> Visitor for Rewrite<W> {
     }
 
     fn outcome(&mut self, outcome: Option<Outcome>) {
-        if !self.white || self.ply > 1 {
-            write!(self.w, " ").unwrap();
+        if let Some(outcome) = outcome {
+            if !self.white || self.ply > 1 {
+                write!(self.w, " ").unwrap();
+            }
+            writeln!(self.w, "{}", outcome).unwrap();
+            self.outcome = true;
         }
-        match outcome {
-            None => write!(self.w, "*"),
-            Some(outcome) => write!(self.w, "{}", outcome),
-        }.unwrap()
     }
 
     fn end_game(&mut self) {
-        if !self.white || self.ply > 1 {
-            writeln!(self.w).unwrap();
+        if !self.outcome {
+            if !self.white || self.ply > 1 {
+                write!(self.w, " ").unwrap();
+            }
+            writeln!(self.w, "*").unwrap();
         }
         writeln!(self.w).unwrap();
     }
@@ -107,7 +112,7 @@ fn main() -> Result<(), io::Error> {
 
         let mut reader = BufferedReader::new(uncompressed);
 
-        let mut stats = Rewrite { w: io::stdout(), ply: 1, white: true, after_comment: false };
+        let mut stats = Rewrite { w: io::stdout(), ply: 1, white: true, after_comment: false, outcome: false };
         reader.read_all(&mut stats)?;
     }
 
