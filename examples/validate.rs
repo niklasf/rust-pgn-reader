@@ -1,7 +1,7 @@
 // Validates moves in PGNs.
 // Usage: cargo run --release --example validate -- [PGN]...
 
-use std::{env, fs::File, io, mem, process};
+use std::{env, fs::File, io, process};
 
 use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
 use shakmaty::{
@@ -13,7 +13,7 @@ use shakmaty::{
 struct Validator {
     games: usize,
     variant: Variant,
-    fen: Fen,
+    fen: Option<Fen>,
     pos: VariantPosition,
     success: bool,
 }
@@ -23,7 +23,7 @@ impl Validator {
         Validator {
             games: 0,
             variant: Variant::Chess,
-            fen: Fen::default(),
+            fen: None,
             pos: VariantPosition::default(),
             success: true,
         }
@@ -36,14 +36,14 @@ impl Visitor for Validator {
     fn begin_game(&mut self) {
         self.games += 1;
         self.variant = Variant::Chess;
-        self.fen = Fen::default();
+        self.fen = None;
         self.success = true;
     }
 
     fn header(&mut self, key: &[u8], value: RawHeader<'_>) {
         if key == b"FEN" {
             self.fen = match Fen::from_ascii(value.as_bytes()) {
-                Ok(fen) => fen,
+                Ok(fen) => Some(fen),
                 Err(err) => {
                     eprintln!(
                         "invalid fen header in game {}: {} ({:?})",
@@ -66,22 +66,26 @@ impl Visitor for Validator {
     }
 
     fn end_headers(&mut self) -> Skip {
-        match VariantPosition::from_setup(
-            self.variant,
-            mem::take(&mut self.fen).into_setup(),
-            CastlingMode::Chess960,
-        ) {
-            Ok(pos) => self.pos = pos,
-            Err(err) => {
-                eprintln!(
-                    "illegal starting position in game {}: {} ({:?} with variant {})",
-                    self.games, err, self.fen, self.variant
-                );
-                self.success = false;
-            }
-        };
-
-        Skip(!self.success)
+        if self.success {
+            self.pos = match self.fen.take() {
+                None => VariantPosition::new(self.variant),
+                Some(fen) => match VariantPosition::from_setup(
+                    self.variant,
+                    fen.into_setup(),
+                    CastlingMode::Chess960,
+                ) {
+                    Ok(pos) => pos,
+                    Err(err) => {
+                        eprintln!("illegal starting position in game {}: {}", self.games, err);
+                        self.success = false;
+                        return Skip(true);
+                    }
+                },
+            };
+            Skip(false)
+        } else {
+            Skip(true)
+        }
     }
 
     fn begin_variation(&mut self) -> Skip {
