@@ -1,14 +1,20 @@
 // Validates moves in PGNs.
 // Usage: cargo run --release --example validate -- [PGN]...
 
-use std::{env, fs::File, io, process};
+use std::{env, fs::File, io, mem, process};
 
 use pgn_reader::{BufferedReader, RawHeader, SanPlus, Skip, Visitor};
-use shakmaty::{fen::Fen, CastlingMode, Chess, Position};
+use shakmaty::{
+    fen::Fen,
+    variant::{Variant, VariantPosition},
+    CastlingMode, Position,
+};
 
 struct Validator {
     games: usize,
-    pos: Chess,
+    variant: Variant,
+    fen: Fen,
+    pos: VariantPosition,
     success: bool,
 }
 
@@ -16,7 +22,9 @@ impl Validator {
     fn new() -> Validator {
         Validator {
             games: 0,
-            pos: Chess::default(),
+            variant: Variant::Chess,
+            fen: Fen::default(),
+            pos: VariantPosition::default(),
             success: true,
         }
     }
@@ -27,14 +35,14 @@ impl Visitor for Validator {
 
     fn begin_game(&mut self) {
         self.games += 1;
-        self.pos = Chess::default();
+        self.variant = Variant::Chess;
+        self.fen = Fen::default();
         self.success = true;
     }
 
     fn header(&mut self, key: &[u8], value: RawHeader<'_>) {
-        // Support games from a non-standard starting position.
         if key == b"FEN" {
-            let fen = match Fen::from_ascii(value.as_bytes()) {
+            self.fen = match Fen::from_ascii(value.as_bytes()) {
                 Ok(fen) => fen,
                 Err(err) => {
                     eprintln!(
@@ -45,14 +53,11 @@ impl Visitor for Validator {
                     return;
                 }
             };
-
-            self.pos = match fen.into_position(CastlingMode::Chess960) {
-                Ok(pos) => pos,
-                Err(err) => {
-                    eprintln!(
-                        "illegal fen header in game {}: {} ({:?})",
-                        self.games, err, value
-                    );
+        } else if key == b"Variant" {
+            self.variant = match Variant::from_ascii(value.as_bytes()) {
+                Ok(variant) => variant,
+                Err(_) => {
+                    eprintln!("unknown variant in game {}: ({:?})", self.games, value);
                     self.success = false;
                     return;
                 }
@@ -61,6 +66,21 @@ impl Visitor for Validator {
     }
 
     fn end_headers(&mut self) -> Skip {
+        match VariantPosition::from_setup(
+            self.variant,
+            mem::take(&mut self.fen).into_setup(),
+            CastlingMode::Chess960,
+        ) {
+            Ok(pos) => self.pos = pos,
+            Err(err) => {
+                eprintln!(
+                    "illegal starting position in game {}: {} ({:?} with variant {})",
+                    self.games, err, self.fen, self.variant
+                );
+                self.success = false;
+            }
+        };
+
         Skip(!self.success)
     }
 

@@ -13,7 +13,7 @@ edition = "2021"
 [dependencies]
 memchr = "2.2"
 btoi = "0.4"
-shakmaty = "0.23"
+shakmaty = { version = "0.23", git = "https://github.com/niklasf/shakmaty.git" }
 circular = "0.3"
 
 [dev-dependencies]
@@ -23,3 +23,4 @@ xz2 = "0.1"
 flate2 = "1.0"
 lz4 = "1.23"
 zstd = "0.12"
+shakmaty = { version = "0.23", git = "https://github.com/niklasf/shakmaty.git", features = ["variant"] }
