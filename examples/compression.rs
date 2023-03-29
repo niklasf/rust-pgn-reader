@@ -1,10 +1,10 @@
 extern crate arrayvec;
 extern crate huffman_compress;
+extern crate itertools;
 extern crate madvise;
 extern crate memmap;
 extern crate pgn_reader;
 extern crate shakmaty;
-extern crate itertools;
 
 use pgn_reader::{Reader, San, Skip, Visitor};
 
@@ -240,7 +240,10 @@ fn main() {
         for i in 0..3 {
             println!("{}", game_phases[i]);
             for k in 0..256 {
-                println!("new Symbol ({:#b}, {})", codes[i][k].0, codes[i][k].1)
+                println!(
+                    "new Symbol ({:#b}, {}), // {}: {}",
+                    codes[i][k].0, codes[i][k].1, i, histogram.counts_by_game_phase[i][k]
+                );
             }
             println!("histogram = {:?}", &histogram.counts_by_game_phase[i][..]);
             println!(
