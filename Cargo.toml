@@ -26,6 +26,7 @@ bencher = "0.1"
 arrayvec = "0.4"
 huffman-compress = "0.2"
 bit-vec = "0.4"
+itertools = "0.8"
 
 [badges]
 travis-ci = { repository = "niklasf/rust-pgn-reader", branch = "master" }
