@@ -40,20 +40,28 @@ impl Histogram {
         }
     }
 
-    fn huffman(&self) -> (Book<u8>, Tree<u8>) {
-        let weights: HashMap<_, _> = self
+    fn huffman(&self) -> Vec<(Book<u8>, Tree<u8>)> {
+        let weights_by_game_phase: Vec<HashMap<_, _>> = self
             .counts_by_game_phase
             .iter()
-            .flatten()
-            .enumerate()
-            .map(|(k, v)| (k as u8, v + 1))
+            .map(|count| {
+                count
+                    .iter()
+                    .enumerate()
+                    .map(|(k, v)| (k as u8, v + 1))
+                    .collect()
+            })
             .collect();
 
-        codebook(&weights)
+        weights_by_game_phase
+            .iter()
+            .map(|weights| codebook(weights))
+            .collect()
     }
 
     fn bits(&self) -> Vec<u64> {
-        let (book, _) = self.huffman();
+        let huffman = self.huffman();
+        let books_by_game_phase = huffman.iter().map(|(book, _)| book).collect::<Vec<_>>();
 
         self.counts_by_game_phase
             .iter()
@@ -63,7 +71,8 @@ impl Histogram {
                     .iter()
                     .enumerate()
                     .map(|(k, v)| {
-                        book.get(&((k + i * 256) as u8))
+                        books_by_game_phase[i]
+                            .get(&(k as u8))
                             .map_or(0, |c| c.len() as u64 * v)
                     })
                     .sum()
@@ -72,20 +81,23 @@ impl Histogram {
     }
 
     fn codes(&self) -> Vec<Vec<(u64, usize)>> {
-        let (book, _) = self.huffman();
+        let huffman = self.huffman();
+        let books_by_game_phase: Vec<&Book<u8>> = huffman.iter().map(|(book, _)| book).collect();
 
         (0usize..3)
             .map(|i| {
                 (((i * 256) as usize)..((i + 1) * 256))
                     .map(|k| {
-                        book.get(&(k as u8)).map_or((0u64, 0usize), |c| {
-                            (
-                                (0usize..c.len())
-                                    .map(|i| (c[i] as u64) * (1 << (c.len() - 1 - i)))
-                                    .sum(),
-                                c.len(),
-                            )
-                        })
+                        books_by_game_phase[i]
+                            .get(&(k as u8))
+                            .map_or((0u64, 0usize), |c| {
+                                (
+                                    (0usize..c.len())
+                                        .map(|i| (c[i] as u64) * (1 << (c.len() - 1 - i)))
+                                        .sum(),
+                                    c.len(),
+                                )
+                            })
                     })
                     .sorted_by_key(|k| k.1)
                     .collect::<Vec<(u64, usize)>>()
