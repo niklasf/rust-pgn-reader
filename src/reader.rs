@@ -1,11 +1,11 @@
-use std::{
-    cmp::min,
-    io::{self, Chain, Cursor, Read},
-};
-
 use shakmaty::{
     san::{San, SanPlus, Suffix},
     CastlingSide, Color, Outcome,
+};
+use std::io::Seek;
+use std::{
+    cmp::min,
+    io::{self, Chain, Cursor, Read},
 };
 
 // use slice_deque::SliceDeque;
@@ -25,6 +25,8 @@ trait ReadPgn {
 
     /// Returns the current buffer.
     fn buffer(&self) -> &[u8];
+
+    fn get_file_position(&mut self ) -> Result<u64, Self::Err>;
 
     /// Consume n bytes from the buffer.
     fn consume(&mut self, n: usize);
@@ -451,6 +453,7 @@ trait ReadPgn {
     }
 
     fn read_game<V: Visitor>(&mut self, visitor: &mut V) -> Result<Option<V::Result>, Self::Err> {
+
         self.skip_bom()?;
         self.skip_whitespace()?;
 
@@ -458,7 +461,8 @@ trait ReadPgn {
             return Ok(None);
         }
 
-        visitor.begin_game();
+        
+        visitor.begin_game(self.get_file_position()?);
         visitor.begin_headers();
         self.read_headers(visitor)?;
         if let Skip(false) = visitor.end_headers() {
@@ -519,7 +523,7 @@ impl<T: AsRef<[u8]>> BufferedReader<Cursor<T>> {
     }
 }
 
-impl<R: Read> BufferedReader<R> {
+impl<R: Read + Seek> BufferedReader<R> {
     /// Create a new buffered PGN reader.
     ///
     /// ```
@@ -603,7 +607,7 @@ impl<R: Read> BufferedReader<R> {
     }
 }
 
-impl<R: Read> ReadPgn for BufferedReader<R> {
+impl<R: Read + Seek> ReadPgn for BufferedReader<R> {
     type Err = io::Error;
 
     fn fill_buffer_and_peek(&mut self) -> io::Result<Option<u8>> {
@@ -636,6 +640,14 @@ impl<R: Read> ReadPgn for BufferedReader<R> {
     fn peek(&self) -> Option<u8> {
         self.buffer.inner.data().first().cloned()
     }
+
+    fn get_file_position(&mut self ) -> Result<u64, Self::Err> {
+        let filepos = self.inner.stream_position()?;
+        let bufcap = self.buffer.inner.capacity() as u64;
+        let bufpos = self.buffer.inner.position() as u64;
+        Ok((filepos - bufcap + bufpos + 1))
+    }
+
 }
 
 /// Iterator returned by
@@ -647,7 +659,7 @@ pub struct IntoIter<'a, V: 'a, R> {
     reader: BufferedReader<R>,
 }
 
-impl<'a, V: Visitor, R: Read> Iterator for IntoIter<'a, V, R> {
+impl<'a, V: Visitor, R: Read + Seek> Iterator for IntoIter<'a, V, R> {
     type Item = Result<V::Result, io::Error>;
 
     fn next(&mut self) -> Option<Self::Item> {

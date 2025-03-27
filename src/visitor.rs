@@ -10,7 +10,7 @@ pub trait Visitor {
     type Result;
 
     /// Called at the start of the game.
-    fn begin_game(&mut self) {}
+    fn begin_game(&mut self, _file_position: u64) {}
 
     /// Called directly before reading game headers.
     fn begin_headers(&mut self) {}
