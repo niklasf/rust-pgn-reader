@@ -472,7 +472,7 @@ trait ReadPgn {
         }
 
         self.skip_whitespace()?;
-        Ok(Some(visitor.end_game()))
+        Ok(Some(visitor.end_game(self.get_file_position()?)))
     }
 
     fn skip_game(&mut self) -> Result<bool, Self::Err> {
@@ -611,6 +611,7 @@ impl<R: Read + Seek> ReadPgn for BufferedReader<R> {
     type Err = io::Error;
 
     fn fill_buffer_and_peek(&mut self) -> io::Result<Option<u8>> {
+
         while self.buffer.inner.available_data() < MIN_BUFFER_SIZE {
             let remainder = self.buffer.inner.space();
             let size = self.inner.read(remainder)?;
@@ -644,8 +645,8 @@ impl<R: Read + Seek> ReadPgn for BufferedReader<R> {
     fn get_file_position(&mut self ) -> Result<u64, Self::Err> {
         let filepos = self.inner.stream_position()?;
         let bufcap = self.buffer.inner.capacity() as u64;
-        let bufpos = self.buffer.inner.position() as u64;
-        Ok((filepos - bufcap + bufpos + 1))
+        let bufpos: u64 = self.buffer.inner.capacity() as u64 - self.buffer.inner.available_data() as u64;
+                Ok(filepos - bufcap + bufpos)
     }
 
 }
@@ -690,7 +691,7 @@ mod tests {
     impl Visitor for GameCounter {
         type Result = ();
 
-        fn end_game(&mut self) {
+        fn end_game(&mut self, _file_position: u64) {
             self.count += 1;
         }
     }
@@ -728,7 +729,7 @@ mod tests {
                 self.nags.push(nag);
             }
 
-            fn end_game(&mut self) {}
+            fn end_game(&mut self, _file_position: u64) {}
         }
 
         let mut collector = NagCollector { nags: Vec::new() };
@@ -754,7 +755,7 @@ mod tests {
                 self.sans.push(san.san);
             }
 
-            fn end_game(&mut self) {}
+            fn end_game(&mut self, _file_position: u64) {}
         }
 
         let mut collector = SanCollector { sans: Vec::new() };
