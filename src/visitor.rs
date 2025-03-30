@@ -10,7 +10,7 @@ pub trait Visitor {
     type Result;
 
     /// Called at the start of the game.
-    fn begin_game(&mut self) {}
+    fn begin_game(&mut self, _file_position: u64) {}
 
     /// Called directly before reading game headers.
     fn begin_headers(&mut self) {}
@@ -43,7 +43,7 @@ pub trait Visitor {
     fn outcome(&mut self, _outcome: Option<Outcome>) {}
 
     /// Called after parsing a game. Can produce a custom result.
-    fn end_game(&mut self) -> Self::Result;
+    fn end_game(&mut self, _file_position: u64) -> Self::Result;
 }
 
 pub(crate) struct SkipVisitor;
@@ -57,5 +57,5 @@ impl Visitor for SkipVisitor {
     fn begin_variation(&mut self) -> Skip {
         Skip(true)
     }
-    fn end_game(&mut self) {}
+    fn end_game(&mut self, _file_position: u64) {}
 }
