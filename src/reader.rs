@@ -644,9 +644,8 @@ impl<R: Read + Seek> ReadPgn for BufferedReader<R> {
 
     fn get_file_position(&mut self ) -> Result<u64, Self::Err> {
         let filepos = self.inner.stream_position()?;
-        let bufcap = self.buffer.inner.capacity() as u64;
-        let bufpos: u64 = self.buffer.inner.capacity() as u64 - self.buffer.inner.available_data() as u64;
-                Ok(filepos - bufcap + bufpos)
+        let bufpos: u64 = self.buffer.inner.available_data() as u64;
+        Ok(filepos - bufpos)
     }
 
 }
