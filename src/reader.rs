@@ -661,7 +661,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_game() -> Result<(), Error<Infallible>> {
+    fn test_empty_game() -> io::Result<()> {
         let mut counter = GameCounter::default();
         let mut reader = BufferedReader::new(io::Cursor::new(b"  "));
         reader.read_game(&mut counter)?;
@@ -670,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn test_trailing_space() -> Result<(), Error<Infallible>> {
+    fn test_trailing_space() -> io::Result<()> {
         let mut counter = GameCounter::default();
         let mut reader = BufferedReader::new(io::Cursor::new(b"1. e4 1-0\n\n\n\n\n  \n"));
         reader.read_game(&mut counter)?;
@@ -680,25 +680,25 @@ mod tests {
         Ok(())
     }
 
-    struct NagCollector {
-        nags: Vec<Nag>,
-    }
-
-    impl Visitor for NagCollector {
-        type Output = ();
-        type Error = Infallible;
-
-        fn nag(&mut self, nag: Nag) -> Result<(), Self::Error> {
-            self.nags.push(nag);
-
-            Ok(())
+    #[test]
+    fn test_nag() -> io::Result<()> {
+        struct NagCollector {
+            nags: Vec<Nag>,
         }
 
-        fn end_game(&mut self) -> Self::Output {}
-    }
+        impl Visitor for NagCollector {
+            type Output = ();
+            type Error = Infallible;
 
-    #[test]
-    fn test_nag() -> Result<(), Error<Infallible>> {
+            fn nag(&mut self, nag: Nag) -> Result<(), Self::Error> {
+                self.nags.push(nag);
+
+                Ok(())
+            }
+
+            fn end_game(&mut self) -> Self::Output {}
+        }
+
         let mut collector = NagCollector { nags: Vec::new() };
         let mut reader = BufferedReader::new(io::Cursor::new(b"1.f3! e5$71 2.g4?? Qh4#!?"));
         reader.read_game(&mut collector)?;
@@ -709,25 +709,25 @@ mod tests {
         Ok(())
     }
 
-    struct SanCollector {
-        sans: Vec<San>,
-    }
-
-    impl Visitor for SanCollector {
-        type Output = ();
-        type Error = Infallible;
-
-        fn san(&mut self, san: SanPlus) -> Result<(), Self::Error> {
-            self.sans.push(san.san);
-
-            Ok(())
+    #[test]
+    fn test_null_moves() -> io::Result<()> {
+        struct SanCollector {
+            sans: Vec<San>,
         }
 
-        fn end_game(&mut self) -> Self::Output {}
-    }
+        impl Visitor for SanCollector {
+            type Output = ();
+            type Error = Infallible;
 
-    #[test]
-    fn test_null_moves() -> Result<(), Error<Infallible>> {
+            fn san(&mut self, san: SanPlus) -> Result<(), Self::Error> {
+                self.sans.push(san.san);
+
+                Ok(())
+            }
+
+            fn end_game(&mut self) -> Self::Output {}
+        }
+
         let mut collector = SanCollector { sans: Vec::new() };
         let mut reader = BufferedReader::new(io::Cursor::new(b"1. e4 -- 2. Nf3 -- 3. -- e5"));
         reader.read_game(&mut collector)?;
@@ -739,5 +739,58 @@ mod tests {
         assert_eq!(collector.sans[4], San::Null);
         assert_ne!(collector.sans[5], San::Null);
         Ok(())
+    }
+
+    #[test]
+    fn test_error_in_tags() {
+        struct TagErrorer {
+            error_when: usize,
+            now: usize
+        }
+
+        impl Visitor for TagErrorer {
+            type Output = ();
+            type Error = String;
+
+            fn begin_tags(&mut self) -> Result<(), Self::Error> {
+                self.now = 0;
+
+                Ok(())
+            }
+
+            fn tag(&mut self, _name: &[u8], value: RawTag<'_>) -> Result<(), Self::Error> {
+                if self.now == self.error_when {
+                    return Err(value.decode_utf8_lossy().to_string());
+                }
+
+                self.now += 1;
+
+                Ok(())
+            }
+
+            fn end_game(&mut self) -> Self::Output {
+                ()
+            }
+        }
+
+        let mut errorer = TagErrorer {
+            error_when: 2,
+            now: 0
+        };
+
+        let mut reader = BufferedReader::new(io::Cursor::new(r#"[Foo "f"]
+[Bar "\"bar"]
+[Err "err"]
+[Qux "q\"\"\"\\ux"]
+        "#));
+
+        assert_eq!(Err("err".to_string()), reader.read_game(&mut errorer).unwrap().unwrap());
+
+        errorer.error_when = 0;
+
+        // finishes reading Err
+        assert_eq!(Ok(()), reader.read_game(&mut errorer).unwrap().unwrap());
+        // Reads Qux
+        assert_eq!(Err("q\"\"\"\\ux".to_string()), reader.read_game(&mut errorer).unwrap().unwrap());
     }
 }
