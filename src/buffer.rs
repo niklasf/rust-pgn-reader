@@ -3,20 +3,20 @@ use std::{
     io::{self, Read},
 };
 
-pub const CAPACITY: usize = 4096;
+pub const CAPACITY: usize = 1 << 14;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
-    buf: [u8; CAPACITY],
+    buf: Box<[u8]>,
     index: usize,
     len: usize,
 }
 
 impl Default for Buffer {
-    /// Creates a new [`Buffer`] on the stack that can hold [`CAPACITY`] many elements.
+    /// Creates a new [`Buffer`] that can hold [`CAPACITY`] many elements.
     fn default() -> Self {
         Buffer {
-            buf: [0; CAPACITY],
+            buf: vec![0; CAPACITY].into_boxed_slice(),
             index: 0,
             len: 0,
         }
@@ -40,6 +40,13 @@ impl Buffer {
         self.len
     }
 
+    /// Equivalent to [`self.data_range().len()`](Self::data_range).
+    #[inline]
+    fn data_len(&self) -> usize {
+        self.len - self.index
+    }
+
+    #[inline]
     /// Range from [`Self::index`] to [`Self::len`].
     ///
     /// This is where [`Self::data`] lives.
@@ -95,7 +102,7 @@ impl Buffer {
             self.backshift();
         }
 
-        while self.data().len() < n {
+        while self.data_len() < n {
             let len = reader.read(&mut self.buf[self.len..])?;
 
             // EOF
