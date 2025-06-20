@@ -10,26 +10,30 @@ use shakmaty::{
 
 // use slice_deque::SliceDeque;
 use crate::{
+    buffer,
     buffer::Buffer,
     types::{Nag, RawComment, RawTag, Skip},
     visitor::{SkipVisitor, Visitor},
+};
+
+const MAX_TAG_LINE_LENGTH: usize = 1024;
+const MAX_COMMENT_LENGTH: usize = 4096;
+const _: () = {
+    assert!(MAX_TAG_LINE_LENGTH <= buffer::CAPACITY);
+    assert!(MAX_COMMENT_LENGTH <= buffer::CAPACITY);
 };
 
 #[derive(Debug, Clone)]
 pub struct BufferedReader<R> {
     reader: R,
     buffer: Buffer,
-    max_tag_line_length: usize,
-    max_comment_length: usize,
 }
 
 impl<R: Read> BufferedReader<R> {
     pub fn new(reader: R) -> BufferedReader<R> {
         BufferedReader {
             reader,
-            buffer: Buffer::with_capacity(1 << 14),
-            max_tag_line_length: 1024,
-            max_comment_length: 4096,
+            buffer: Buffer::default(),
         }
     }
 
@@ -105,7 +109,7 @@ impl<R: Read> BufferedReader<R> {
     fn read_tags<V: Visitor>(&mut self, visitor: &mut V) -> io::Result<()> {
         while let &[ch, ..] = self
             .buffer
-            .ensure_bytes(self.max_tag_line_length, &mut self.reader)?
+            .ensure_bytes(MAX_TAG_LINE_LENGTH, &mut self.reader)?
         {
             match ch {
                 b'[' => {
@@ -232,7 +236,7 @@ impl<R: Read> BufferedReader<R> {
     fn read_movetext<V: Visitor>(&mut self, visitor: &mut V) -> io::Result<()> {
         while let &[ch, ..] = self
             .buffer
-            .ensure_bytes(self.max_comment_length, &mut self.reader)?
+            .ensure_bytes(MAX_COMMENT_LENGTH, &mut self.reader)?
         {
             match ch {
                 b'{' => {
@@ -321,7 +325,7 @@ impl<R: Read> BufferedReader<R> {
                     } else {
                         self.buffer.bump();
                         while let Some(ch) = self.buffer.peek() {
-                            if b'0' <= ch && ch <= b'9' {
+                            if ch.is_ascii_digit() {
                                 self.buffer.bump();
                             } else {
                                 break;
@@ -335,7 +339,7 @@ impl<R: Read> BufferedReader<R> {
                 b'2' | b'3' | b'4' | b'5' | b'6' | b'7' | b'8' | b'9' => {
                     self.buffer.bump();
                     while let Some(ch) = self.buffer.peek() {
-                        if b'0' <= ch && ch <= b'9' {
+                        if ch.is_ascii_digit() {
                             self.buffer.bump();
                         } else {
                             break;

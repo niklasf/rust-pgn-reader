@@ -1,72 +1,120 @@
-use std::cmp;
-use std::io::{self, Read};
+use std::{
+    cmp,
+    io::{self, Read},
+};
+
+pub const CAPACITY: usize = 4096;
 
 #[derive(Debug, Clone)]
 pub struct Buffer {
-    buf: Box<[u8]>,
-    pos: usize,
-    filled: usize,
+    buf: [u8; CAPACITY],
+    index: usize,
+    len: usize,
+}
+
+impl Default for Buffer {
+    /// Creates a new [`Buffer`] on the stack that can hold [`CAPACITY`] many elements.
+    fn default() -> Self {
+        Buffer {
+            buf: [0; CAPACITY],
+            index: 0,
+            len: 0,
+        }
+    }
 }
 
 impl Buffer {
-    pub fn with_capacity(capacity: usize) -> Buffer {
-        Buffer {
-            buf: vec![0; capacity].into_boxed_slice(),
-            pos: 0,
-            filled: 0,
-        }
+    /// The byte currently being read.
+    ///
+    /// Never greater than [`Self::len`].
+    pub fn index(&self) -> usize {
+        self.index
     }
 
+    /// The number of bytes being read.
+    ///
+    /// `self.buf.len()` is like `Vec::capacity` and `self.len` is like `Vec::len`.
+    ///
+    /// Never greater than [`CAPACITY`].
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Range from [`Self::index`] to [`Self::len`].
+    ///
+    /// This is where [`Self::data`] lives.
+    fn data_range(&self) -> std::ops::Range<usize> {
+        self.index..self.len
+    }
+
+    /// Gets the data in [`Self::data_range`].
     #[inline]
     pub fn data(&self) -> &[u8] {
-        // SAFETY: self.pos <= self.filled <= self.buf.len()
-        unsafe { self.buf.get_unchecked(self.pos..self.filled) }
+        debug_assert!(self.index <= self.len && self.len <= CAPACITY);
+
+        // SAFETY: self.index <= self.len <= CAPACITY
+        unsafe { self.buf.get_unchecked(self.data_range()) }
     }
 
+    /// Sets [`self.index`](Self::index) and [`self.len`](Self::len) to 0.
     #[inline]
     pub fn discard_data(&mut self) {
-        self.pos = 0;
-        self.filled = 0;
+        self.index = 0;
+        self.len = 0;
     }
 
+    /// Advances [`Self::index`] by `n` up to [`Self::len`].
     #[inline]
     pub fn consume(&mut self, n: usize) {
-        self.pos = cmp::min(self.pos + n, self.filled);
+        self.index = cmp::min(self.index + n, self.len);
     }
 
+    /// Like [`self.consume(1)`](Self::consume).
     #[inline]
     pub fn bump(&mut self) {
         self.consume(1);
     }
 
+    /// Returns the first item in [`Self::data`].
     #[inline]
     pub fn peek(&self) -> Option<u8> {
         self.data().first().copied()
     }
 
+    /// Reads up to the specified amount of bytes to [`Self::data`] and returns [`Self::data`].
+    /// The only situation where this reads less than `n` bytes into [`Self::data`] is if
+    /// EOF is reached.
+    ///
+    /// `n` must be smaller or equal to [`CAPACITY`].
+    /// If it's bigger and `reader` doesn't reach EOF before `n` bytes are read, this function
+    /// will loop infinitely.
     pub fn ensure_bytes(&mut self, n: usize, mut reader: impl Read) -> io::Result<&[u8]> {
-        debug_assert!(n < self.buf.len());
+        debug_assert!(n <= CAPACITY);
+
+        if self.index > 0 {
+            self.backshift();
+        }
 
         while self.data().len() < n {
-            if self.pos > 0 {
-                self.backshift();
-            }
+            let len = reader.read(&mut self.buf[self.len..])?;
 
-            let len = reader.read(&mut self.buf[self.filled..])?;
+            // EOF
             if len == 0 {
                 break;
             }
 
-            self.filled += len;
+            self.len += len;
         }
+
         Ok(self.data())
     }
 
-    pub fn backshift(&mut self) {
-        let range = self.pos..self.filled;
-        self.pos = 0;
-        self.filled = range.len();
-        self.buf.copy_within(range, 0);
+    /// Moves [`Self::data`] to the beginning.
+    fn backshift(&mut self) {
+        let data_range = self.data_range();
+        self.index = 0;
+        self.len = data_range.len();
+        self.buf.copy_within(data_range, 0);
     }
 }
 

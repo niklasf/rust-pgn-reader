@@ -1,7 +1,7 @@
 // Validates moves in PGNs.
 // Usage: cargo run --release --example validate -- [PGN]...
 
-use std::{env, fs::File, io, process};
+use std::{env, fs::File, io, process, time::Instant};
 
 use pgn_reader::{BufferedReader, RawTag, SanPlus, Skip, Visitor};
 use shakmaty::{fen::Fen, CastlingMode, Chess, Position};
@@ -86,6 +86,7 @@ impl Visitor for Validator {
 }
 
 fn main() -> io::Result<()> {
+    let start = Instant::now();
     let mut all_ok = true;
 
     for arg in env::args().skip(1) {
@@ -117,6 +118,10 @@ fn main() -> io::Result<()> {
         println!("{}: {}", arg, if file_ok { "success" } else { "errors" });
         all_ok &= file_ok;
     }
+
+    let end = Instant::now();
+
+    println!("took ~{:?}", end.duration_since(start));
 
     if !all_ok {
         process::exit(1);
