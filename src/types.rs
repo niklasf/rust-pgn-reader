@@ -106,7 +106,7 @@ impl fmt::Display for InvalidNag {
 }
 
 impl Error for InvalidNag {
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "invalid nag"
     }
 }
@@ -143,7 +143,7 @@ impl<'a> RawTag<'a> {
         let mut head = 0;
         let mut decoded: Vec<u8> = Vec::new();
         for escape in memchr::memchr_iter(b'\\', self.0) {
-            match self.0.get(escape + 1).cloned() {
+            match self.0.get(escape + 1).copied() {
                 Some(ch) if ch == b'\\' || ch == b'"' => {
                     decoded.extend_from_slice(&self.0[head..escape]);
                     head = escape + 1;
@@ -182,7 +182,7 @@ impl<'a> RawTag<'a> {
     }
 }
 
-impl<'a> fmt::Debug for RawTag<'a> {
+impl fmt::Debug for RawTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.decode_utf8_lossy())
     }
@@ -192,14 +192,14 @@ impl<'a> fmt::Debug for RawTag<'a> {
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct RawComment<'a>(pub &'a [u8]);
 
-impl<'a> RawComment<'a> {
+impl RawComment<'_> {
     /// Returns the raw byte representation of the comment.
     pub fn as_bytes(&self) -> &[u8] {
         self.0
     }
 }
 
-impl<'a> fmt::Debug for RawComment<'a> {
+impl fmt::Debug for RawComment<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", String::from_utf8_lossy(self.as_bytes()).as_ref())
     }
