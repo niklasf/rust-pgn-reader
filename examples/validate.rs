@@ -121,10 +121,7 @@ fn main() -> io::Result<()> {
 
     let end = Instant::now();
 
-    println!(
-        "took ~{} microsecs",
-        end.duration_since(start).as_micros()
-    );
+    println!("took ~{} microsecs", end.duration_since(start).as_micros());
 
     if !all_ok {
         process::exit(1);
