@@ -52,13 +52,13 @@ impl Display for ValidatorError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidFen { game, fen, error } => {
-                write!(f, "invalid fen tag in game {}: {} ({:?})", game, fen, error)
+                write!(f, "invalid fen tag in game {}: {} ({})", game, fen, error)
             }
             Self::IllegalFen { game, fen, error } => {
-                write!(f, "illegal fen tag in game {}: {} ({:?})", game, fen, error)
+                write!(f, "illegal fen tag in game {}: {} ({})", game, fen, error)
             }
             Self::IllegalSan { game, san, error } => {
-                write!(f, "illegal san in game {}: {} {}", game, san, error)
+                write!(f, "illegal san in game {}: {} ({})", game, san, error)
             }
         }
     }
