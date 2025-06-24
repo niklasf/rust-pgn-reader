@@ -39,16 +39,16 @@
 //! impl Visitor for MoveCounter {
 //!     type Output = usize;
 //!     type Error = Infallible;
-//! 
+//!
 //!     fn begin_tags(&mut self) -> Result<(), Self::Error> {
 //!         self.moves = 0;
-//! 
+//!
 //!         Ok(())
 //!     }
 //!
 //!     fn san(&mut self, _san_plus: SanPlus) -> Result<(), Self::Error> {
 //!         self.moves += 1;
-//! 
+//!
 //!         Ok(())
 //!     }
 //!
@@ -111,7 +111,7 @@
 //!                 self.pos = pos;
 //!             }
 //!         }
-//! 
+//!
 //!         Ok(())
 //!     }
 //!
@@ -123,7 +123,7 @@
 //!         if let Ok(m) = san_plus.san.to_move(&self.pos) {
 //!             self.pos.play_unchecked(m);
 //!         }
-//! 
+//!
 //!         Ok(())
 //!     }
 //!
